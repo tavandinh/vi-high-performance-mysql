@@ -1,6 +1,5 @@
-Indexes (also called “keys” in MySQL) are data structures that storage engines use to
-find rows quickly. They also have several other beneficial properties that we’ll explore
-in this chapter.
+Index (hay còn gọi là "key" trong MySQL) là một cấu trúc dữ liệu(data structure) mà các storage engine dùng để
+tìm kiếm các hàng(row) một cách nhanh chóng. Index có một số một vài lợi ích mà chúng tôi sẽ đề cập đến trong chương này.
 
 Indexes are critical for good performance, and become more important as your data
 grows larger. Small, lightly loaded databases often perform well even without proper
@@ -177,9 +176,6 @@ Here are some limitations of B-Tree indexes:
     though it’s usually more efficient to use a complete prefix. MySQL might offer this option in the future;
     we show workarounds later in the chapter.
 
-```
-Indexing Basics | 151
-```
 
 - They are not useful if the lookup does not start from the leftmost side of the indexed
     columns. For example, this index won’t help you find all people named Bill or all
@@ -207,7 +203,7 @@ Some of these limitations are not inherent to B-Tree indexes, but are a result o
 the MySQL query optimizer and storage engines use indexes. Some of them might be
 removed in the future.
 
-**Hash indexes**
+## Hash indexes
 
 A _hash index_ is built on a hash table and is useful only for exact lookups that use every
 column in the index.^4 For each row, the storage engine computes a _hash code_ of the
