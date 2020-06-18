@@ -6,7 +6,7 @@ Bản dịch từ cuốn sách  high performance MYSQL, bản dịch này đư�
 
 1. Fork repo này
 1. Cài đặt tất cả các gói phụ thuộc (dependencies): `npm i`
-1. Mở server dev ở [`localhost:4000`](http://localhost:4000/archives): `npm start`
+1. Mở server dev ở [`localhost:4000`](http://localhost:4000/archives/): `npm start`
 
 Bây giờ bạn có thể chỉnh sửa các file trong thư mục `source/posts` và refresh trình duyệt để kiểm tra kết quả chỉnh sửa.
 
