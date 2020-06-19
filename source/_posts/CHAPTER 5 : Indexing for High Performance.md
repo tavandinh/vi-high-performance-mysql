@@ -1,65 +1,41 @@
 Index (hay còn gọi là "key" trong MySQL) là một cấu trúc dữ liệu(data structure) mà các storage engine dùng để
 tìm kiếm các hàng(row) một cách nhanh chóng. Index có một số một vài lợi ích mà chúng tôi sẽ đề cập đến trong chương này.
 
-Indexes are critical for good performance, and become more important as your data
-grows larger. Small, lightly loaded databases often perform well even without proper
-indexes, but as the dataset grows, performance can drop very quickly.^1 Unfortunately,
-indexes are often forgotten or misunderstood, so poor indexing is a leading cause of
-real-world performance problems. That’s why we put this material early in the bookeven 
-earlier than our discussion of query optimization.
+Index rất quan trọng để có hiệu suất tốt và trở nên quan trọng hơn khi dữ liệu của bạn ngày càng lớn hơn. 
+Khi mà cơ sở dữ liệu còn ít thì việc tải còn nhẹ và hoạt động tốt ngay cả khi không có index, nhưng khi dữ liệu ngày càng một tăng lên thì hiệu suất có thể giảm rất nhanh. Thật không may, index thường bị bỏ quê hoặc là hiểu không đúng về nó, vậy nên việc đánh index tệ là nguyên nhân hàng đầu của các vấn đề về hiệu suất trong các ứng dụng. Đó là lý do tại sao chúng tôi đưa phần index ra trước phần tối ưu hóa câu query.
 
-Index optimization is perhaps the most powerful way to improve query performance.
-Indexes can improve performance by many orders of magnitude, and optimal indexes
-can sometimes boost performance about two orders of magnitude more than indexes
-that are merely “good.” Creating truly optimal indexes will often require you to rewrite
-queries, so this chapter and the next one are closely related.
+Tối ưu hóa index có lẽ là cách tốt nhất để cải thiện hiệu suất của câu query. Tạo các index thường sẽ yêu cầu bạn viết lại các câu query, 
+vậy nên chương này và chương sau sẽ có mốt liên hệ chặt chẽ với nhau.
 
-# Indexing Basics
+# Cơ bản về  Index
 
-The easiest way to understand how an index works in MySQL is to think about the
-index in a book. To find out where a particular topic is discussed in a book, you look
-in the index, and it tells you the page number(s) where that term appears.
+Cách đơn giản nhất để hiểu cách index hoạt động trong MYSQL là tưởng tượng về mục lục của sách. Để  tìm kiếm một bài biết trong sách 
+thì cách nhanh nhất chúng ta thường làm là tìm số trang của bài viết đó ở phần mục lục và di chuyển đến đó.
 
-In MySQL, a storage engine uses indexes in a similar way. It searches the index’s data
-structure for a value. When it finds a match, it can find the row that contains the match.
-Suppose you run the following query:
-
+Trong MySQL, một store engine sử dụng các index tương tự như vậy. Nó tìm kiếm  cấu trúc data của index cho giá trị (như cách chúng ta tìm số trang ở mục lục sách). Khi tìm thấy kết quả trùng khớp, nó có thể tìm thấy `row` chứa kết quả trùng khớp.
+Giả sử bạn chạy truy vấn sau, [ Tải sakila database ](https://downloads.mysql.com/docs/sakila-db.zip) :
 ```
 mysql> SELECT first_name FROM sakila.actor WHERE actor_id = 5;
 ```
 
-There’s an index on the actor_id column, so MySQL will use the index to find rows
-whose actor_id is 5. In other words, it performs a lookup on the values in the index
-and returns any rows containing the specified value.
+Có một index trên column actor_id, vậy nên MySQL sẽ sử dụng index để tìm các row có actor_id là 5. Nói cách khác, nó thực hiện tra cứu các giá trị trong index và trả về bất kỳ row nào chứa giá trị đã chỉ định.
 
-An index contains values from one or more columns in a table. If you index more than
-one column, the column order is very important, because MySQL can only search
-efficiently on a leftmost prefix of the index. Creating an index on two columns is not
-the same as creating two separate single-column indexes, as you’ll see.
+Một index chứa các giá trị từ một hoặc nhiều column trong table. Nếu bạn tạo index nhiều hơn một column, thứ tự column là rất quan trọng, bởi vì MySQL chỉ có thể tìm kiếm hiệu quả trên tiền tố ngoài cùng **bên trái** của index. Như bạn thấy việc tạo một index trên hai column không giống như tạo hai index trên một column riêng biệt.
 
 ```
-If I Use an ORM, Do I Need to Care?
-The short version: yes, you still need to learn about indexing, even if you rely on an
-object-relational mapping (ORM) tool.
-ORMs produce logically and syntactically correct queries (most of the time), but they
-rarely produce index-friendly queries, unless you use them for only the most basic types
-of queries, such as primary key lookups. You can’t expect your ORM, no matter how
-sophisticated, to handle the subtleties and complexities of indexing. Read the rest of
-this chapter if you disagree! It’s sometimes a hard job for an expert human to puzzle
-through all of the possibilities, let alone an ORM.
+Nếu tôi dùng ORM, liệu tôi có cần quan tâm Index không ?
+Câu trả lời ngắn gọn: Vâng, bạn vẫn phải cần học cách đánh index kể cả khi bạn dùng ORM.
+
+ORM tạo ra các query một cách chính xác (hầu hết thời gian), nhưng chúng hiếm khi tạo ra các query thân thiện với index, trừ khi bạn chỉ sử dụng chúng cho các loại truy vấn cơ bản nhất, chẳng hạn như tìm kiếm khóa chính. Đọc phần còn lại của chương này nếu bạn không đồng ý! Việc tối ưu hóa xử lý của index đôi khi là một công việc khó khăn cho các chuyên gia chứ chưa nói đến ORM.
 ```
-# Types of Indexes
+# Các loại index
 
-There are many types of indexes, each designed to perform well for different purposes.
-Indexes are implemented in the storage engine layer, not the server layer. Thus, they
-are not standardized: indexing works slightly differently in each engine, and not all
-engines support all types of indexes. Even when multiple engines support the same
-index type, they might implement it differently under the hood.
+Có nhiều loại index, mỗi loại được thiết kế để hoạt động tốt cho các mục đích khác nhau. Các index được thực hiện trong lớp storage engine, không phải lớp server. Index hoạt động hơi khác nhau trong mỗi engine và không phải tất cả các engine đều hỗ trợ tất cả các loại index. Ngay cả khi nhiều engine hỗ trợ cùng loại index, chúng có thể thực hiện nó theo cách khác.
 
-That said, let’s look at the index types MySQL currently supports, their benefits, and
-their drawbacks.
+Bây giờ chúng ta sẽ tìm hiểu các loại index mà MySQL support, tìm hiểu ưu và nhược điểm của chúng
 
-## B-Tree indexes
+
+## B-Tree index
 
 When people talk about an index without mentioning a type, they’re probably referring
 to a _B-Tree index_ , which typically uses a B-Tree data structure to store its data. Most
@@ -93,7 +69,7 @@ engine follows these pointers. It finds the right pointer by looking at the valu
 node pages, which define the upper and lower bounds of the values in the child nodes.
 Eventually, the storage engine either determines that the desired value doesn’t exist or
 successfully reaches a leaf page.
-    
+
 ![ An index built on a B-Tree](../../asserts/images/5-1.png)
 
 
