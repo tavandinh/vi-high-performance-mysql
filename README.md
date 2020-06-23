@@ -17,6 +17,6 @@ Vì phiên bản này mới chỉ được bắt đầu, chúng ta sẽ tập tr
 * Chỉ dịch một file cho mỗi PR
 * Trước khi bắt tay vào dịch một file, hãy kiểm tra trên [trang PR](https://github.com/vuejs-vn/vuejs.org/pulls) xem có ai đã hoặc đang dịch file đó hay chưa
 * Tạo một branch mới từ `master` với tên là đường dẫn đến file đó, ví dụ `posts/7_Advanced_MySQL_Features.md`
-* Tạo một thay đổi nhỏ để submit PR vào `master`, với tên PR là `[CHORE] /path/to/file.md`
+* Tạo một thay đổi nhỏ để submit PR vào `master`, với tên PR là `[CHORE] CHAPTER xx info change`
 
 

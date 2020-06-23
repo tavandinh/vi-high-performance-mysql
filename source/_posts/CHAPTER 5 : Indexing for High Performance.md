@@ -37,54 +37,25 @@ Bây giờ chúng ta sẽ tìm hiểu các loại index mà MySQL support, tìm 
 
 ## B-Tree index
 
-When people talk about an index without mentioning a type, they’re probably referring
-to a _B-Tree index_ , which typically uses a B-Tree data structure to store its data. Most
-of MySQL’s storage engines support this index type. The Archive engine is the excep-
-tion: it didn’t support indexes at all until MySQL 5.1, when it started to allow a single
-indexed AUTO_INCREMENT column.
+Khi mọi người nói về index mà không đề cập đến loại index, họ có thể đang nói đến B-Tree index, được sử dụng cấu trúc dữ liệu B-tree để lưu trữ dữ liệu của nó. Hầu hết các storage engine của MySQL đều hỗ trợ loại index này. Archive engine là một ngoại lệ: nó không hoàn toàn support index cho đến khi MySQL 5.1 nó bắt đầu cho phép một row AUTO_INCREMENT được tạo index duy nhất.
 
-We use the term “B-Tree” for these indexes because that’s what MySQL uses in CREATE
-TABLE and other statements. However, storage engines might use different storage
-structures internally. For example, the NDB Cluster storage engine uses a T-Tree data
+Chúng tôi sử dụng thuật ngữ *B-tree* cho loạ index này bởi vì đó là những gì MySQL sử dụng trong *CREATE TABLE* và các câu lệnh khác. Tuy nhiên, các storage engine có thể sử dụng các cấu trúc lưu trữ khác nhau trong bên trọng. Ví dụ: storage engine NDB Cluster sử dụng cấu trúc dữ liệu T-Tree cho index này, mặc dù chúng có tên BTREE và InnoDB sử dụng B+Trees. Trong cuốn sách này chúng ta sẽ không đề cập đến các biến thể trong cấu trúc và thuật .
 
-structure for these indexes, even though they’re labeled BTREE, and InnoDB uses
-B+Trees. The variations in the structures and algorithms are out of scope for this book,
-though.
+Các storage engine sử dụng các index B-Tree theo nhiều cách khác nhau, nó có thể ảnh hưởng đến hiệu suất. Chẳng hạn, MyISAM sử dụng kỹ thuật nén tiền tố (prefix compression technique ) làm cho các index nhỏ hơn, nhưng InnoDB để các giá trị không bị nén trong các index của nó. Ngoài ra, MyISAM index refer đến các row được tạo index theo vị trí lưu trữ vật lý của chúng, nhưng InnoDB refer đến chúng theo các giá trị khóa chính của chúng. Mỗi biến thể có lợi ích và nhược điểm.
 
-Storage engines use B-Tree indexes in various ways, which can affect performance. For
-instance, MyISAM uses a prefix compression technique that makes indexes smaller,
-but InnoDB leaves values uncompressed in its indexes. Also, MyISAM indexes refer to
-the indexed rows by their physical storage locations, but InnoDB refers to them by their
-primary key values. Each variation has benefits and drawbacks.
+Ý tưởng chung của B-Tree là tất cả các giá trị được lưu trữ theo thứ tự, và mỗi trang lá (leaf page) có cùng khoảng cách từ gốc (root). Hình 5-1 cho thấy một biểu diễn trừu tượng của B-Tree index, tương ứng với cách hoạt động của index InnoDB. MyISAM sử dụng một cấu trúc khác nhau, nhưng các nguyên tắc là tương tự nhau.
 
-The general idea of a B-Tree is that all the values are stored in order, and each leaf page
-is the same distance from the root. Figure 5-1 shows an abstract representation of a B-
-Tree index, which corresponds roughly to how InnoDB’s indexes work. MyISAM uses
-a different structure, but the principles are similar.
 
-A B-Tree index speeds up data access because the storage engine doesn’t have to scan
-the whole table to find the desired data. Instead, it starts at the root node (not shown
-in this figure). The slots in the root node hold pointers to child nodes, and the storage
-engine follows these pointers. It finds the right pointer by looking at the values in the
-node pages, which define the upper and lower bounds of the values in the child nodes.
-Eventually, the storage engine either determines that the desired value doesn’t exist or
-successfully reaches a leaf page.
+B-Tree index tăng tốc truy cập dữ liệu vì storage engine không phải quét toàn bộ table để tìm dữ liệu mong muốn. Thay vào đó, nó bắt đầu tại nút gốc (không được hiển thị trong hình này), các khe trong nút gốc giữ các con trỏ tới các nút con và storage engine theo các con trỏ này. Nó tìm thấy con trỏ bên phải bằng cách xem các giá trị trong các node page, xác định giới hạn trên và dưới của các giá trị trong các nút con. Cuối cùng, storage engine sẽ xác định rằng giá trị mong muốn không tồn tại hoặc đạt đến thành công một leaf page.
 
 ![ An index built on a B-Tree](../../asserts/images/5-1.png)
 
+Các leaf page rất đặc biệt bởi vì chúng có con trỏ tới dữ liệu được lập index thay vì con trỏ đến các page khác. (Các storage engine nhau có các loại 'con trỏ' đến dữ liệu khác nhau.)
+Hình minh họa của chúng tôi chỉ hiển thị một trang nút (node page) và trang lá (leaf page) của nó, nhưng có thể có nhiều cấp độ của node page giữa root và leaf. Độ sâu của cây phụ thuộc vào độ lớn của table.
 
-Leaf pages are special, because they have pointers to the indexed data instead of
-pointers to other pages. (Different storage engines have different types of “pointers” to
-the data.) Our illustration shows only one node page and its leaf pages, but there might
-be many levels of node pages between the root and the leaves. The tree’s depth depends
-on how big the table is.
+Bởi vì B-tree lưu trữ các cột được lập index theo thứ tự, chúng rất hữu ích cho việc tìm kiếm các phạm vi dữ liệu. Chẳng hạn, việc lập index cho trường text sẽ chuyển qua các giá trị theo thứ tự bảng chữ cái, vậy nên việc tìm kiếm "những người có tên bắt đầu bằng I đến K" là hiệu quả.
 
-Because B-Trees store the indexed columns in order, they’re useful for searching for
-ranges of data. For instance, descending the tree for an index on a text field passes
-through values in alphabetical order, so looking for “everyone whose name begins with
-I through K” is efficient.
-
-Suppose you have the following table:
+Giả sử bạn có bảng sau:
 
 ```
 CREATE TABLE People (
@@ -95,63 +66,45 @@ gender enum('m', 'f')not null,
 key(last_name, first_name, dob)
 );
 ```
-The index will contain the values from the last_name, first_name, and dob columns for
-every row in the table. Figure 5-2 illustrates how the index arranges the data it stores.
+
+Index sẽ chứa các giá trị từ các cột last_name, first_name và dob cho mỗi row trong table. Hình 5-2 minh họa cách index sắp xếp dữ liệu mà nó lưu trữ.
 
 ![ Sample entries from a B-Tree](../../asserts/images/5-2.png)
 
+Lưu ý rằng index sắp xếp các giá trị theo thứ tự của các column lúc tạo index trong câu lệnh `CREATE TABLE`. Nhìn vào hai index cuối: có hai người có cùng tên nhưng ngày sinh khác nhau và họ được sắp xếp theo ngày sinh.
 
-Notice that the index sorts the values according to the order of the columns given in
-the index in the CREATE TABLE statement. Look at the last two entries: there are two
-people with the same name but different birth dates, and they’re sorted by birth date.
+**Các loại query có thể sử dụng  B-Tree index.** Các index B-Tree hoạt động tốt cho việc tra cứu theo full
+key value, một key range(khoảng) hoặc một key prefix(tiền tố). Chúng chỉ hữu ích nếu việc tra cứu sử dụng tiền tố ngoài cùng bên trái (leftmost prefix) của index. Index mà chúng tôi đã trình bày trong phần trên sẽ hữu ích cho các loại query sau: 
 
-B-Tree indexes work well for lookups by the full
-key value, a key range, or a key prefix. They are useful only if the lookup uses a leftmost
-prefix of the index.^3 The index we showed in the previous section will be useful for the
-following kinds of queries:
+*_Match full key value_*
 
-_Match the full value_
-A match on the full key value specifies values for all columns in the index. For
-example, this index can help you find a person named Cuba Allen who was born
-on 1960-01-01.
+Match full key value là chỉ định giá trị cho tất cả các cột trong index. Ví dụ: index này có thể giúp bạn tìm thấy một người tên Cuba Allen, người sinh ngày 1960-01-01.
 
-_Match a leftmost prefix_
-This index can help you find all people with the last name Allen. This uses only
-the first column in the index.
+*_Match với (leftmost prefix)tiền tố ngoài cùng bên trái (column bên trái) _*
 
-_Match a column prefix_
-You can match on the first part of a column’s value. This index can help you find
-all people whose last names begin with J. This uses only the first column in the
-index.
+Index này có thể giúp bạn tìm thấy tất cả những người có tên last name là Allen. Điều này chỉ sử dụng column đầu tiên trong index.
 
-_Match a range of values_
-This index can help you find people whose last names are between Allen and Bar-
-rymore. This also uses only the first column.
+*_Match với column prefix (tiền tố column)_*
 
-_Match one part exactly and match a range on another part_
-This index can help you find everyone whose last name is Allen and whose first
-name starts with the letter K (Kim, Karl, etc.). This is an exact match on last_
-name and a range query on first_name.
+Bạn có thể match với phần đầu tiên giá trị của column . Index này có thể giúp bạn tìm thấy tất cả những người có họ bắt đầu bằng `J`. Điều này chỉ sử dụng column đầu tiên trong index.
 
-_Index-only queries_
-B-Tree indexes can normally support index-only queries, which are queries that
-access only the index, not the row storage. We discuss this optimization in “Cov-
-ering Indexes” on page 177.
+*_Match a range of values_*
 
-Because the tree’s nodes are sorted, they can be used for both lookups (finding values)
-and ORDER BY queries (finding values in sorted order). In general, if a B-Tree can help
-you find a row in a particular way, it can help you sort rows by the same criteria. So,
-our index will be helpful for ORDER BY clauses that match all the types of lookups we
-just listed.
+Index này có thể giúp bạn tìm những người có last names giữa Allen và Barrymore. Điều này cũng chỉ sử dụng column đầu tiên.
 
-Here are some limitations of B-Tree indexes:
+*_Match one part exactly and match a range on another part (match chính xác một phần và một phạm vi trên một phần khác)_*
+
+Index này có thể giúp bạn tìm thấy tất cả những người có last name là Allen và first name bắt đầu bằng chữ K (Kim, Karl, v.v.). Đây là một kết hợp chính xác(exact) trên last_name và một phạm vi truy vấn (range query) trên first_name.
+
+*_Index-only queries_*
+
+B-Tree index thường có thể hỗ trợ các index-only query, là các truy vấn chỉ truy cập vào index, không phải row storage.
+
+Bởi vì các tree node được sắp xếp, chúng có thể được sử dụng cho cả tra cứu (tìm giá trị) và truy vấn ORDER BY (tìm giá trị theo thứ tự được sắp xếp). Nói chung, nếu B-Tree có thể giúp bạn tìm một row theo một cách cụ thể, nó có thể giúp bạn sắp xếp các row theo cùng một tiêu chí. Vì vậy, index của chúng tôi sẽ hữu ích cho các mệnh đề ORDER BY phù hợp với tất cả các loại tra cứu mà chúng tôi vừa liệt kê.
+
+Dưới đây là một số hạn chế của chỉ mục B-Tree:
 
 **Types of queries that can use a B-Tree index.**
-
-3. This is MySQL-specific, and even version-specific. Some other databases can use nonleading index parts,
-    though it’s usually more efficient to use a complete prefix. MySQL might offer this option in the future;
-    we show workarounds later in the chapter.
-
 
 - They are not useful if the lookup does not start from the leftmost side of the indexed
     columns. For example, this index won’t help you find all people named Bill or all
