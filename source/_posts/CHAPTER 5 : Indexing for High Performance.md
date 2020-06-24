@@ -103,34 +103,14 @@ B-Tree index thường có thể hỗ trợ các index-only query, là các truy
 Bởi vì các tree node được sắp xếp, chúng có thể được sử dụng cho cả tra cứu (tìm giá trị) và truy vấn ORDER BY (tìm giá trị theo thứ tự được sắp xếp). Nói chung, nếu B-Tree có thể giúp bạn tìm một row theo một cách cụ thể, nó có thể giúp bạn sắp xếp các row theo cùng một tiêu chí. Vì vậy, index của chúng tôi sẽ hữu ích cho các mệnh đề ORDER BY phù hợp với tất cả các loại tra cứu mà chúng tôi vừa liệt kê.
 
 Dưới đây là một số hạn chế của chỉ mục B-Tree:
+- Chúng không hữu ích nếu việc tra cứu không bắt đầu từ phía bên trái của các cột được đánh index. Ví dụ: index không giúp bạn tìm thấy tất cả những người có tên Bill hoặc tất cả những người sinh vào một ngày nhất định, bởi vì những cột đó không nằm ngoài cùng(cột bên trái) trong index. Tương tự như vậy, bạn không thể sử dụng index để tìm những người có lastname *kết thúc* với một chữ cái cụ thể.
 
-**Types of queries that can use a B-Tree index.**
+- Bạn không thể bỏ qua các column trong index. Đó là, bạn không thể tìm thấy tất cả những người có last name là Smith và sinh ra vào một ngày cụ thể. Nếu bạn không chỉ định một giá trị cho cột first_name thì MySQL chỉ có thể sử dụng column đầu tiên của index.
+- Storage engine không thể tối ưu hóa truy cập với bất kỳ column nào ở bên phải của điều kiện phạm vi đầu tiên (first range condition). Ví dụ: nếu truy vấn của bạn là `WHERE last_name = "Smith" AND first_name LIKE 'J%' AND dob='1976-12-23'`, index access sẽ chỉ sử dụng hai cột đầu tiên trong index , vì `LIKE` là một điều kiện phạm vi (range condition) (máy chủ có thể sử dụng phần còn lại của các column cho các mục đích khác). Đối với một cột có số lượng giá trị giới hạn, bạn thường có thể giải quyết vấn đề này bằng cách chỉ định các điều kiện đẳng thức (><=...) thay vì điều kiện phạm vi. Chúng tôi nêu ra các ví dụ chi tiết về trường hợp này trong nhưng chương sau.
 
-- They are not useful if the lookup does not start from the leftmost side of the indexed
-    columns. For example, this index won’t help you find all people named Bill or all
-    people born on a certain date, because those columns are not leftmost in the index.
-    Likewise, you can’t use the index to find people whose last name _ends_ with a par-
-    ticular letter.
-- You can’t skip columns in the index. That is, you won’t be able to find all people
-    whose last name is Smith and who were born on a particular date. If you don’t
-    specify a value for the first_name column, MySQL can use only the first column
-    of the index.
-- The storage engine can’t optimize accesses with any columns to the right of the
-    first range condition. For example, if your query is WHERE last_name="Smith" AND
-    first_name LIKE 'J%' AND dob='1976-12-23', the index access will use only the
-    first two columns in the index, because the LIKE is a range condition (the server
-    can use the rest of the columns for other purposes, though). For a column that has
-    a limited number of values, you can often work around this by specifying equality
-    conditions instead of range conditions. We show detailed examples of this in the
-    indexing case study later in this chapter.
+Bây giờ bạn đã biết tại sao chúng tôi nói thứ tự các column trong index là cực kỳ quan trọng: những hạn chế này đều liên quan đến thứ tự của column. Để có hiệu suất tối ưu, bạn có thể cần tạo các index giống column nhưng theo các thứ tự khác nhau để đáp ứng các truy vấn của mình.
 
-Now you know why we said the column order is extremely important: these limitations
-are all related to column ordering. For optimal performance, you might need to create
-indexes with the same columns in different orders to satisfy your queries.
-
-Some of these limitations are not inherent to B-Tree indexes, but are a result of how
-the MySQL query optimizer and storage engines use indexes. Some of them might be
-removed in the future.
+Một số hạn chế này không phải là do index của B-Tree, mà là kết quả của cách trình tối ưu hóa truy vấn MYSQL (MySQL query optimizer) và cách mà storage engine sử dụng index. Một số trong chúng có thể được gỡ bỏ trong tương lai.
 
 ## Hash indexes
 
