@@ -114,47 +114,33 @@ Một số hạn chế này không phải là do index của B-Tree, mà là k�
 
 ## Hash indexes
 
-A _hash index_ is built on a hash table and is useful only for exact lookups that use every
-column in the index.^4 For each row, the storage engine computes a _hash code_ of the
-indexed columns, which is a small value that will probably differ from the hash codes
-computed for other rows with different key values. It stores the hash codes in the index
-and stores a pointer to each row in a hash table.
+Hash index được xây dựng trên một hash table và chỉ hữu ích cho các tra cứu chính xác sử dụng mọi column trong index. Với mỗi row, store engine sẽ tính *hash code* của các column được lập index, đây là một giá trị nhỏ và hash code khác nhau giữa các row. Nó lưu hash code trong index và lưu trữ một con trỏ tới mỗi row trong hash table.
 
-In MySQL, only the Memory storage engine supports explicit hash indexes. They are
-the default index type for Memory tables, though Memory tables can have B-Tree in-
-dexes, too. The Memory engine supports nonunique hash indexes, which is unusual
-in the database world. If multiple values have the same hash code, the index will store
-their row pointers in the same hash table entry, using a linked list.
+Trong MySQL, chỉ có Memory storage engine hỗ trợ các explicit hash index . Chúng là loại index mặc định cho các Memory table, mặc dù các Memory table cũng có thể B-Tree index. Memory engine hỗ trợ các nonunique hash index, điều không bình thường trong thế giới cơ sở dữ liệu. Nếu nhiều giá trị có cùng hash code, index sẽ lưu trữ các con trỏ hàng (row pointer) của chúng trong cùng một hash table entry, sử dụng danh sách được liên kết.
 
-Here’s an example. Suppose we have the following table:
+Dưới đây là một ví dụ. Giả sử chúng ta có bảng sau:
 
 ```
 CREATE TABLE testhash (
 fname VARCHAR(50) NOT NULL,
 lname VARCHAR(50) NOT NULL,
-```
-4. See the computer science literature for more on hash tables.
-
-
-```
 KEY USING HASH(fname)
 ) ENGINE=MEMORY;
 ```
-containing this data:
+Nó có dữ liệu như thế này:
 
 ```
 mysql> SELECT * FROM testhash;
 +--------+-----------+
-| fname | lname |
+| fname  | lname     |
 +--------+-----------+
-| Arjen | Lentz |
-| Baron | Schwartz |
-| Peter | Zaitsev |
-| Vadim | Tkachenko |
+| Arjen  | Lentz     |
+| Baron  | Schwartz  |
+| Peter  | Zaitsev   |
+| Vadim  | Tkachenko |
 +--------+-----------+
 ```
-Now suppose the index uses an imaginary hash function called f(), which returns the
-following values (these are just examples, not real values):
+Bây giờ giả sử hash index sử dụng một hàm để hash là  f(), trả về các giá trị sau (đây chỉ là ví dụ, không phải giá trị thực):
 
 ```
 f('Arjen')= 2323
@@ -162,86 +148,49 @@ f('Baron')= 7437
 f('Peter')= 8784
 f('Vadim')= 2458
 ```
-The index’s data structure will look like this:
+Cấu trúc dữ liệu của index sẽ trông như thế này:
+```
++--------+------------------+
+| Slot   | Value            |
++--------+------------------+
+| 2323   | Pointer to row 1 |
+| 2458   | Pointer to row 4 |
+| 7437   | Pointer to row 2 |
+| 8784   | Pointer to row 3 |
++--------+------------------+
+```
 
-```
-Slot Value
-2323 Pointer to row 1
-2458 Pointer to row 4
-7437 Pointer to row 2
-8784 Pointer to row 3
-```
-Notice that the slots are ordered, but the rows are not. Now, when we execute this
-query:
+Lưu ý rằng các slot được sắp xếp, nhưng các row thì không. Bây giờ, khi chúng tôi thực hiện truy vấn này:
 
 ```
 mysql> SELECT lname FROM testhash WHERE fname='Peter';
 ```
-MySQL will calculate the hash of 'Peter' and use that to look up the pointer in the
-index. Because f('Peter') = 8784, MySQL will look in the index for 8784 and find the
-pointer to row 3. The final step is to compare the value in row 3 to 'Peter', to make
-sure it’s the right row.
 
-Because the indexes themselves store only short hash values, hash indexes are very
-compact. As a result, lookups are usually lightning fast. However, hash indexes have
-some limitations:
+MySQL sẽ tính toán mã hash của 'Peter' và sử dụng số đó để tra cứu con trỏ trong index. Vì f ('Peter') = 8784, MySQL sẽ tìm trong index cho 8784 và tìm con trỏ tới hàngrow 3 (Pointer to row 3). Bước cuối cùng là so sánh giá trị trong hàng 3 với 'Peter', để đảm bảo rằng nó đúng.
 
-- Because the index contains only hash codes and row pointers rather than the values
-    themselves, MySQL can’t use the values in the index to avoid reading the rows.
-    Fortunately, accessing the in-memory rows is very fast, so this doesn’t usually de-
-    grade performance.
+Vì bản thân các index chỉ lưu trữ các giá trị được hash ngắn, nên các hash index rất nhỏ gọn. Do đó, việc tra cứu thường nhanh như chớp. Tuy nhiên, hash index có một số hạn chế:
 
-```
-Indexing Basics | 153
-```
+- Do index chỉ chứa hash code và con trỏ hàng thay vì chính các giá trị, MySQL không thể sử dụng các giá trị trong index để tránh đọc các hàng. May mắn thay, việc truy cập vào các hàng trong ram là rất nhanh, do đó điều này thường không ảnh hưởng đến hiệu năng(performance).
 
-- MySQL can’t use hash indexes for sorting because they don’t store rows in sorted
-    order.
-- Hash indexes don’t support partial key matching, because they compute the hash
-    from the entire indexed value. That is, if you have an index on (A,B) and your
-    query’s WHERE clause refers only to A, the index won’t help.
-- Hash indexes support only equality comparisons that use the =, IN(), and <=>
-    operators (note that <> and <=> are not the same operator). They can’t speed up
-    range queries, such as WHERE price > 100.
-- Accessing data in a hash index is very quick, unless there are many collisions (mul-
-    tiple values with the same hash). When there are collisions, the storage engine must
-    follow each row pointer in the linked list and compare their values to the lookup
-    value to find the right row(s).
-- Some index maintenance operations can be slow if there are many hash collisions.
-    For example, if you create a hash index on a column with a very low selectivity
-    (many hash collisions) and then delete a row from the table, finding the pointer
-    from the index to that row might be expensive. The storage engine will have to
-    examine each row in that hash key’s linked list to find and remove the reference to
-    the one row you deleted.
+- không thể dùng hash index cho sắp xếp bởi vì nó không lưu hàng đã được sắp xếp.
 
-These limitations make hash indexes useful only in special cases. However, when they
-match the application’s needs, they can improve performance dramatically. An exam-
-ple is in data-warehousing applications where a classic “star” schema requires many
-joins to lookup tables. Hash indexes are exactly what a lookup table requires.
+- Các hash index không hỗ trợ matching một phần key, bởi vì chúng tính toán hash từ toàn bộ giá trị được lập index. Nếu bạn có một index trên cột (A, B) và mệnh đề `WHERE` truy vấn của bạn chỉ đề cập đến cột A thì hash index không được sử dụng trong trường hợp này.
 
-In addition to the Memory storage engine’s explicit hash indexes, the NDB Cluster
-storage engine supports unique hash indexes. Their functionality is specific to the NDB
-Cluster storage engine, which we don’t cover in this book.
+- Các hash index hỗ trợ các phép so sánh bằng sử dụng các toán tử `=, IN () và <=>` (lưu ý rằng `<>` và `<=>` không phải là cùng một toán tử). Nó không thể tăng tốc câu truy vấn phạm vi , chẳng hạn như giá `WHERE> 100`.
 
-The InnoDB storage engine has a special feature called _adaptive hash indexes_. When
-InnoDB notices that some index values are being accessed very frequently, it builds a
-hash index for them in memory on top of B-Tree indexes. This gives its B-Tree indexes
-some properties of hash indexes, such as very fast hashed lookups. This process is
-completely automatic, and you can’t control or configure it, although you can disable
-the adaptive hash index altogether.
+- Truy cập dữ liệu trong một hash index rất nhanh chóng, trừ khi có nhiều xung đột (nhiều giá trị cùng một hash xode). Khi có xung đột, storage engine phải theo từng con trỏ hàng trong danh sách liên kết (linked list) và so sánh giá trị của chúng với giá trị tra cứu để tìm (các) hàng có giá trị đúng.
 
-If your storage engine doesn’t support hash indexes, you
-can emulate them yourself in a manner similar to that InnoDB uses. This will give you
-access to some of the desirable properties of hash indexes, such as a very small index
-size for very long keys.
+- Một số hoạt động bảo trì index có thể bị chậm nếu có nhiều hash code trùng nhau. Ví dụ: nếu bạn tạo một hash index trên một cột có độ chọn lọc rất thấp (nhiều hash code trùn nhau) và sau đó xóa một hàng khỏi bảng, việc tìm con trỏ từ index đến hàng đó có thể gây ra tốn kém. Storage engine sẽ phải kiểm tra từng hàng trong danh sách liên kết (linked list) để tìm kiếm và xoá tham chiếu đến  hàng bạn đã xoá.
 
-The idea is simple: create a pseudohash index on top of a standard B-Tree index. It will
-not be exactly the same thing as a real hash index, because it will still use the B-Tree
-index for lookups. However, it will use the keys’ hash values for lookups, instead of
-the keys themselves. All you need to do is specify the hash function manually in the
-query’s WHERE clause.
+Những hạn chế này làm cho hash index chỉ hữu ích trong trường hợp đặc biệt. Tuy nhiên, khi chúng phù hợp với nhu cầu của ứng dụng, nó có thể cải thiện hiệu suất rất đáng kể. Một ví dụ là khi nằm trong các ứng dụng lưu trữ dữ liệu trong đó một [classic “star” schema](https://en.wikipedia.org/wiki/Star_schema) yêu cầu nhiều phép `join` để tra cứu các bảng. Các hash index là chính xác những gì một bảng tra cứu yêu cầu.
 
-**Building your own hash indexes.**
+Ngoài explicit hash index của Memory storage engine, NDB Cluster storage engine hỗ trợ các unique hash index. Nó là dành riêng cho NDB Cluster storage engine, chúng tôi sẽ không đề cập đến nó trong cuốn sách này.
+
+InnoDB storage engine có một tính năng đặc biệt gọi là *adaptive hash index*. Khi InnoDB thông báo rằng một số giá trị index được truy cập rất thường xuyên, nó sẽ xây dựng một hash index cho chúng trong memory trên đầu các B-Tree index. Điều này cung cấp cho các B-Tree index của nó một số thuộc tính của các hash index như là tra cứu hash rất nhanh. Quá trình này hoàn toàn tự động và bạn không thể control hoặc configure nó, nhưng bạn có thể vô hiệu hóa hoàn toàn adaptive hash index.
+
+**Tự xây dựng hash index của chúng ta.** Nếu storage engine của bạn không hỗ trợ các hash index, bạn có thể tự mô phỏng chúng theo cách tương tự như InnoDB sử dụng. Điều này sẽ cung cấp cho bạn quyền truy cập vào một số thuộc tính mong muốn của các  hash index, chẳng hạn như kích thước index rất nhỏ cho các key rất dài.
+
+Ý tưởng rất đơn giản: tạo ra một index giả trên đầu  B-Tree index. Nó sẽ không hoàn toàn giống với hash index thực sự, bởi vì nó vẫn sẽ sử dụng B-Tree index để tra cứu. Tuy nhiên, nó sẽ sử dụng các hash key giá trị băm cho tra cứu, thay vì key của chúng. Những gì bạn cần làm là chỉ định hàm hash theo cách thủ công trong mệnh đề truy vấn `WHERE`.
 
 
 An example of when this approach works well is for URL lookups. URLs generally
