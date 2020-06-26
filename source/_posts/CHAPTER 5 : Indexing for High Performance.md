@@ -192,32 +192,21 @@ InnoDB storage engine có một tính năng đặc biệt gọi là *adaptive ha
 
 Ý tưởng rất đơn giản: tạo ra một index giả trên đầu  B-Tree index. Nó sẽ không hoàn toàn giống với hash index thực sự, bởi vì nó vẫn sẽ sử dụng B-Tree index để tra cứu. Tuy nhiên, nó sẽ sử dụng các hash key giá trị băm cho tra cứu, thay vì key của chúng. Những gì bạn cần làm là chỉ định hàm hash theo cách thủ công trong mệnh đề truy vấn `WHERE`.
 
-
-An example of when this approach works well is for URL lookups. URLs generally
-cause B-Tree indexes to become huge, because they’re very long. You’d normally query
-a table of URLs like this:
+Một ví dụ khi phương pháp này hoạt động tốt là tìm kiếm URL. Các URL thường làm cho các B-Tree index (Btree lưu giá trị) trở nên khổng lồ, vì chúng rất dài. Bạn thường truy vấn vào bảng `url` như thế này:
 
 ```
 mysql> SELECT id FROM url WHERE url="http://www.mysql.com";
 ```
-But if you remove the index on the url column and add an indexed url_crc column to
-the table, you can use a query like this:
+
+Nhưng nếu bạn xóa index trên cột `url` và thêm cột index `url_crc` vào bảng, bạn có thể sử dụng một truy vấn như thế này:
 
 ```
-mysql> SELECT id FROM url WHERE url="http://www.mysql.com"
--> AND url_crc=CRC32("http://www.mysql.com");
+mysql> SELECT id FROM url WHERE url="http://www.mysql.com" AND url_crc=CRC32("http://www.mysql.com");
 ```
-This works well because the MySQL query optimizer notices there’s a small, highly
-selective index on the url_crc column and does an index lookup for entries with that
-value (1560514994, in this case). Even if several rows have the same url_crc value, it’s
-very easy to find these rows with a fast integer comparison and then examine them to
-find the one that matches the full URL exactly. The alternative is to index the full URL
-as a string, which is much slower.
 
-One drawback to this approach is the need to maintain the hash values. You can do
-this manually or, in MySQL 5.0 and newer, you can use triggers. The following example
-shows how triggers can help maintain the url_crc column when you insert and update
-values. First, we create the table:
+Điều này hoạt động tốt bởi vì MySQL query optimizer được thông báo có một index nhỏ, có tính chọn lọc cao trên cột `url_crc` và thực hiện tìm kiếm index trong trường hợp này có giá trị là `1560514994`. Ngay cả khi một số hàng có cùng giá trị `url_crc`, thì rất dễ tìm thấy các hàng này vì so sánh số nguyên rất nhanh và sau đó kiểm tra chúng để tìm ra một hàng khớp chính xác với URL đầy đủ. Cách khác là lập index URL đầy đủ dưới dạng chuỗi, chậm hơn nhiều.
+
+Một nhược điểm của phương pháp này là cần bảo trì các giá trị đã hash. Bạn có thể làm điều này bằng tay hoặc nếu như bạn sử dụng MySQL từ phiên bản 5.0 trở đi thì bạn có thể sử dụng các `trigger`. Ví dụ sau đây cho thấy cách trigger có thể giúp bảo trì cột url_crc khi bạn chèn và cập nhật giá trị. Đầu tiên, chúng ta tạo bảng:
 
 ```
 CREATE TABLE pseudohash (
@@ -227,8 +216,8 @@ url_crc int unsigned NOT NULL DEFAULT 0,
 PRIMARY KEY(id)
 );
 ```
-Now we create the triggers. We change the statement delimiter temporarily, so we can
-use a semicolon as a delimiter for the trigger:
+
+Bây giờ chúng tôi tạo ra các trigger. Chúng tôi tạm thời thay đổi `/` để phân cách(DELIMITER) câu lệnh, chúng tôi có thể sử dụng dấu `;` làm dấu phân cách cho trigger:
 
 ```
 DELIMITER //
@@ -246,90 +235,68 @@ END;
 DELIMITER ;
 ```
 
-All that remains is to verify that the trigger maintains the hash:
+Tất cả những gì còn lại là kiểm tra trigger bảo trì hash:
 
 ```
 mysql> INSERT INTO pseudohash (url) VALUES ('http://www.mysql.com');
 mysql> SELECT * FROM pseudohash;
 +----+----------------------+------------+
-| id | url | url_crc |
+| id | url                  | url_crc    |
 +----+----------------------+------------+
-| 1 | http://www.mysql.com | 1560514994 |
+| 1 | http://www.mysql.com  | 1560514994 |
 +----+----------------------+------------+
 mysql> UPDATE pseudohash SET url='http://www.mysql.com/' WHERE id=1;
 mysql> SELECT * FROM pseudohash;
-+----+---------------------- +------------+
-| id | url | url_crc |
-+----+---------------------- +------------+
++----+----------------------+------------+
+| id | url                  | url_crc    |
++----+----------------------+------------+
 | 1 | http://www.mysql.com/ | 1558250469 |
-+----+---------------------- +------------+
++----+----------------------+------------+
 ```
-If you use this approach, you should not use SHA1() or MD5() hash functions. These
-return very long strings, which waste a lot of space and result in slower comparisons.
-They are cryptographically strong functions designed to virtually eliminate collisions,
-which is not your goal here. Simple hash functions can offer acceptable collision rates
-with better performance.
+Nếu bạn sử dụng phương pháp này, bạn không nên sử dụng các hàm hash như là  `SHA1()` hoặc `MD5()`. Chúng trả về các chuỗi rất dài, gây tốn bộ nhớ và dẫn đến so sánh chậm hơn. Chúng là các hàm mạnh về hash mật khẩu, chúng được thiết kế để hầu như loại bỏ các trùng lặp, đây không phải là mục tiêu của bạn ở đây. Các hàm hash đơn giản có thể cung cấp tỷ lệ trùng lặp chấp nhận được với hiệu suất tốt hơn.
 
-If your table has many rows and CRC32() gives too many collisions, implement your
-own 64-bit hash function. Make sure you use a function that returns an integer, not a
-string. One way to implement a 64-bit hash function is to use just part of the value
-returned by MD5(). This is probably less efficient than writing your own routine as a
-user-defined function (see Chapter 7), but it’ll do in a pinch:
+Nếu bảng của bạn có nhiều hàng và `CRC32()` tạo ra quá nhiều giá trị trung lặp, hãy thực hiện tạo một hàm hash 64-bit của riêng bạn. Hãy chắc chắn rằng bạn sử dụng hàm trả về một số nguyên, không phải là một chuỗi. Một cách để thực hiện hàm hash 64-bit là chỉ sử dụng một phần của giá trị được trả về bởi `MD5()`. Điều này có lẽ kém hiệu quả hơn so với việc viết hàm do bạn định nghĩa (xem Chương 7). Để thực hiện lấy số trong `MD5()` nó sẽ phải làm một vài bước:
 
 mysql> **SELECT CONV(RIGHT(MD5('http://www.mysql.com/'), 16), 16, 10) AS HASH64;**
 +---------------------+
-| HASH64 |
+| HASH64              |
 +---------------------+
 | 9761173720318281581 |
 +---------------------+
-When you search for a value by its hash, you must also include
-the literal value in your WHERE clause:
+
+**Xử lý hash code trùng lặp.** Khi bạn tìm kiếm một giá trị theo hàm hash của nó, bạn cũng phải tìm bao gồm giá trị bằng chữ trong mệnh đề WHERE của bạn:
 
 ```
-mysql> SELECT id FROM url WHERE url_crc=CRC32("http://www.mysql.com")
--> AND url="http://www.mysql.com";
+mysql> SELECT id FROM url WHERE url_crc=CRC32("http://www.mysql.com") AND url="http://www.mysql.com";
 ```
-The following query will _not_ work correctly, because if another URL has the CRC32()
-value 1560514994, the query will return both rows:
 
+Theo dõi câu truy vấn dưới đây sẽ hoạt động *không chính xác* bởi vì nếu một url khác có giá trị `CRC32()` là 1560514994 thì câu truy vấn sẽ trả về cả hai:
 ```
 mysql> SELECT id FROM url WHERE url_crc=CRC32("http://www.mysql.com");
 ```
-The probability of a hash collision grows much faster than you might think, due to the
-so-called Birthday Paradox. CRC32() returns a 32-bit integer value, so the probability of
-a collision reaches 1% with as few as 93,000 values. To illustrate this, we loaded all the
-words in _/usr/share/dict/words_ into a table along with their CRC32() values, resulting in
-98,569 rows. There is already one collision in this set of data! The collision makes the
-following query return more than one row:
 
-**Handling hash collisions.**
-
+Xác suất xảy ra xung đột hash(mã hash giống nhau) tăng nhanh hơn nhiều so với bạn nghĩ cái này đươcj gọi là [Birthday Paradox](https://en.wikipedia.org/wiki/Birthday_problem). `CRC32()` trả về giá trị nguyên 32-bit, do đó xác suất để trùng lặp đạt 1% với ít nhất 93.000 giá trị. Để minh họa điều này, chúng tôi đã đưa tất cả các từ trong `/usr/share/dict/words` vào một bảng cùng với các giá trị `CRC32()` của chúng, có đến 98.569 hàng. Đã có một sự xung đột trong bộ dữ liệu này! Sự xung đột làm cho truy vấn sau trả về nhiều hơn một hàng:
 
 ```
 mysql> SELECT word, crc FROM words WHERE crc = CRC32('gnu');
 +---------+------------+
-| word | crc |
+| word    |  crc       |
 +---------+------------+
 | codding | 1774765869 |
-| gnu | 1774765869 |
+| gnu     | 1774765869 |
 +---------+------------+
 ```
-The correct query is as follows:
-
+Câu truy vấn đúng như sau: 
 ```
 mysql> SELECT word, crc FROM words WHERE crc = CRC32('gnu')AND word = 'gnu';
 +------+------------+
-| word | crc |
+| word | crc        |
 +------+------------+
-| gnu | 1774765869 |
+| gnu  | 1774765869 |
 +------+------------+
 ```
-To avoid problems with collisions, you must specify both conditions in the WHERE
-clause. If collisions aren’t a problem—for example, because you’re doing statistical
-queries and you don’t need exact results—you can simplify, and gain some efficiency,
-by using only the CRC32() value in the WHERE clause. You can also use the FNV64() func-
-tion, which ships with Percona Server and can be installed as a plugin in any version
-of MySQL. It’s 64 bits long, very fast, and much less prone to collisions than CRC32().
+
+Để tránh các vấn đề xung đột mã hash, bạn phải chỉ định cả hai điều kiện trong mệnh đề `WHERE`. Ví dụ bạn đang thực hiện truy vấn thống kê và bạn không cần kết quả chính xác thì sự xung đột mã hash không thành vấn đề, bạn có thể đơn giản hóa câu truy vấn bằng cách chỉ sử dụng giá trị `CRC32()` trong mệnh đề `WHERE` để đạt hiệu suất tốt hơn. Bạn cũng có thể sử dụng hàm `FNV64()` nó có trong Percona Server và có thể được cài đặt như một plugin trong bất kì version nào của MySQL . Nó có độ dài 64 bit, rất nhanh và ít bị xung đột hơn `CRC32()`.
 
 **Spatial (R-Tree) indexes**
 
