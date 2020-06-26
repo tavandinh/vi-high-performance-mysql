@@ -256,13 +256,14 @@ mysql> SELECT * FROM pseudohash;
 Nếu bạn sử dụng phương pháp này, bạn không nên sử dụng các hàm hash như là  `SHA1()` hoặc `MD5()`. Chúng trả về các chuỗi rất dài, gây tốn bộ nhớ và dẫn đến so sánh chậm hơn. Chúng là các hàm mạnh về hash mật khẩu, chúng được thiết kế để hầu như loại bỏ các trùng lặp, đây không phải là mục tiêu của bạn ở đây. Các hàm hash đơn giản có thể cung cấp tỷ lệ trùng lặp chấp nhận được với hiệu suất tốt hơn.
 
 Nếu bảng của bạn có nhiều hàng và `CRC32()` tạo ra quá nhiều giá trị trung lặp, hãy thực hiện tạo một hàm hash 64-bit của riêng bạn. Hãy chắc chắn rằng bạn sử dụng hàm trả về một số nguyên, không phải là một chuỗi. Một cách để thực hiện hàm hash 64-bit là chỉ sử dụng một phần của giá trị được trả về bởi `MD5()`. Điều này có lẽ kém hiệu quả hơn so với việc viết hàm do bạn định nghĩa (xem Chương 7). Để thực hiện lấy số trong `MD5()` nó sẽ phải làm một vài bước:
-
+```
 mysql> **SELECT CONV(RIGHT(MD5('http://www.mysql.com/'), 16), 16, 10) AS HASH64;**
 +---------------------+
 | HASH64              |
 +---------------------+
 | 9761173720318281581 |
 +---------------------+
+```
 
 **Xử lý hash code trùng lặp.** Khi bạn tìm kiếm một giá trị theo hàm hash của nó, bạn cũng phải tìm bao gồm giá trị bằng chữ trong mệnh đề WHERE của bạn:
 
@@ -298,33 +299,17 @@ mysql> SELECT word, crc FROM words WHERE crc = CRC32('gnu')AND word = 'gnu';
 
 Để tránh các vấn đề xung đột mã hash, bạn phải chỉ định cả hai điều kiện trong mệnh đề `WHERE`. Ví dụ bạn đang thực hiện truy vấn thống kê và bạn không cần kết quả chính xác thì sự xung đột mã hash không thành vấn đề, bạn có thể đơn giản hóa câu truy vấn bằng cách chỉ sử dụng giá trị `CRC32()` trong mệnh đề `WHERE` để đạt hiệu suất tốt hơn. Bạn cũng có thể sử dụng hàm `FNV64()` nó có trong Percona Server và có thể được cài đặt như một plugin trong bất kì version nào của MySQL . Nó có độ dài 64 bit, rất nhanh và ít bị xung đột hơn `CRC32()`.
 
-**Spatial (R-Tree) indexes**
+**Spatial (R-Tree) index**
 
-MyISAM supports spatial indexes, which you can use with partial types such as GEOME
-TRY. Unlike B-Tree indexes, spatial indexes don’t require your WHERE clauses to operate
-on a leftmost prefix of the index. They index the data by all dimensions at the same
-time. As a result, lookups can use any combination of dimensions efficiently. However,
-you must use the MySQL GIS functions, such as MBRCONTAINS(), for this to work, and
-MySQL’s GIS support isn’t great, so most people don’t use it. The go-to solution for
-GIS in an open source RDBMS is PostGIS in PostgreSQL.
+ MyISAM support spatial index, bạn có thể sử dụng thông số dạng` tọa độ (GEOMETRY)`. Không giống B-Tree index, spatial index không yêu cầu mệnh đề `WHERE` của bạn hoạt động trên tiền tố ngoài cùng bên trái của index. Nó đánh index theo tất cả các chiều cùng 1 lúc, ví dụ có 3 column thì đánh 3 chiều index. Với kết quả đó, việc tra cứu có thể sử dụng bất kỳ cách kết hợp nào giữa các chiều 1 cách hiệu quả. Tuy nhiên bạn phải sử dụng MySQL GIS function kiểu như `MBRCONTAINS()` cho công việc tìm kiếm và MySQL support GIS không tốt lắm, phần lớn mọi người không dùng nó. Giải pháp toàn vẹn là sử dụng PostGIS của PostgreSQL.
 
-**Full-text indexes**
+**Full-text index**
 
-FULLTEXT is a special type of index that finds keywords in the text instead of comparing
-values directly to the values in the index. Full-text searching is completely different
-from other types of matching. It has many subtleties, such as stopwords, stemming and
-plurals, and Boolean searching. It is much more analogous to what a search engine does
-than to simple WHERE parameter matching.
+FULLTEXT là 1 trường hợp đặc biệt của index, nó chỉ tìm keywork xuất hiện trong gía trị chứ không phải là so sánh toàn bộ với giá trị. Full-text searching hoàn toàn khác với những loại matching khác. Nó có rất nhiều sự tinh tế, ví dụ như stopwords, stemming và plurals và Boolean searching. Nó không đơn giản như những gì storage engine làm với mệnh đề `WHERE` chỉ cần matching với giá trị, nó kiểu dạng analogous.
 
-Having a full-text index on a column does not eliminate the value of a B-Tree index on
-the same column. Full-text indexes are for MATCH AGAINST operations, not ordinary
-WHERE clause operations.
+Một column có full-text index không có nghĩa là nó loại trừ B-Tree index. Full-text index dùng toán tử` MATCH AGAINST` chứ không phải toán tử ở mệnh đề `WHERE`.
 
-We discuss full-text indexing in more detail in Chapter 7.
-
-```
-Indexing Basics | 157
-```
+Chúng ta sẽ nói nhiều hơn về nó ở Chương 7.
 
 **Other types of index**
 
