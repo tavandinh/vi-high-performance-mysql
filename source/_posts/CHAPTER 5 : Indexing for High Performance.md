@@ -334,25 +334,13 @@ Sách của Lahdenmaki and Leach còn giới thiệu hệ thống three-star(ba 
 Chúng tôi sẽ quay trở lại phương pháp đánh giá này trong suốt chương này.
 
 
-```
-Is an Index the Best Solution?
-An index isn’t always the right tool. At a high level, keep in mind that indexes are most
-effective when they help the storage engine find rows without adding more work than
-they avoid. For very small tables, it is often more effective to simply read all the rows
-in the table. For medium to large tables, indexes can be very effective. For enormous
-tables, the overhead of indexing, as well as the work required to actually use the indexes,
-can start to add up. In such cases you might need to choose a technique that identifies
-groups of rows that are interesting to the query, instead of individual rows. You can
-use partitioning for this purpose; see Chapter 7.
-If you have lots of tables, it can also make sense to create a metadata table to store some
-characteristics of interest for your queries. For example, if you execute queries that
-perform aggregations over rows in a multitenant application whose data is partitioned
-into many tables, you can record which users of the system are actually stored in each
-table, thus letting you simply ignore tables that don’t have information about those
-users. These tactics are usually useful only at extremely large scales. In fact, this is a
-crude approximation of what Infobright does. At the scale of terabytes, locating indi-
-vidual rows doesn’t make sense; indexes are replaced by per-block metadata.
-```
+
+>**Index có phải là giải pháp tốt nhất**
+
+> Index không phải lúc nào cũng là công cụ thich học. Hãy luôn luôn nhớ rằng index chỉ có hiệu quả nhất khi chúng giúp storage engine tìm row . Đối với các bảng rất nhỏ, thường sẽ hiệu quả hơn khi chỉ cần đọc tất cả các hàng trong bảng. Đối với các bảng từ trung bình đến lớn, các index có thể rất hiệu quả. Đối với các bảng khổng lồ, chi phí lập index, cũng như công việc cần thiết để thực sự sử dụng các index có thể bắt đầu cộng lại. Trong những trường hợp như vậy, bạn có thể cần chọn một kỹ thuật xác định các nhóm hàng cho truy vấn, thay vì các hàng riêng lẻ. Bạn có thể sử dụng phân vùng cho mục đích này; xem Chương 7.
+
+> If you have lots of tables, it can also make sense to create a metadata table to store some characteristics of interest for your queries. For example, if you execute queries that perform aggregations over rows in a multitenant application whose data is partitioned into many tables, you can record which users of the system are actually stored in each table, thus letting you simply ignore tables that don’t have information about those users. These tactics are usually useful only at extremely large scales. In fact, this is a crude approximation of what Infobright does. At the scale of terabytes, locating indi- vidual rows doesn’t make sense; indexes are replaced by per-block metadata.
+
 ### Indexing Strategies for High Performance
 
 Creating the correct indexes and using them properly is essential to good query per-
