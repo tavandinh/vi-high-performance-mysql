@@ -1,9 +1,6 @@
 
 ```
-CHAPTER 6
-```
-```
-Query Performance Optimization
+CHAPTER 6 Query Performance Optimization
 ```
 In the previous chapters we explained schema optimization and indexing, which are
 necessary for high performance. But they aren’t enough—you also need to design your
