@@ -311,49 +311,27 @@ Một column có full-text index không có nghĩa là nó loại trừ B-Tree i
 
 Chúng ta sẽ nói nhiều hơn về nó ở Chương 7.
 
-**Other types of index**
+**Các loại index khác**
 
-Several third-party storage engines use different types of data structures for their in-
-dexes. For example, TokuDB uses fractal tree indexes. This is a newly developed data
-structure that has some of the same benefits as B-Tree indexes, without some of the
-drawbacks. As you read through this chapter, you’ll see many InnoDB topics, including
-clustered indexes and covering indexes. In most cases, the discussions of InnoDB apply
-equally well to TokuDB.
+Một số loại từ third-party storage engine sử dụng những kiểu cấu trúc dữ liệu khác nhau cho index của nó. Ví dụ, TokuDB sử dụng fractal tree index. Đây là một structure mới được phát triển với những ưu điểm của B-Tree và không mắc phải nhược điểm của B-tree. Nếu như bạn đọc chương này bạn sẽ thấy chúng tôi nhắc đến InnoDB rất nhiều. Hầu hết các trường hợp trong các cuộc thảo luận việc áp dụng fractal tree index cho InnoDB cũng tốt như TokuDB.
 
-ScaleDB uses Patricia tries (that’s not a typo), and other technologies such as InfiniDB
-or Infobright have their own special data structures for optimizing queries.
+ScaleDB sử dụng Patricia tries, và một số công nghệ khác như InfiniDB hay Infobright có cấu trúc dữ liệu đặc biệt của riêng của nó cho optimizing query.
 
-### Benefits of Indexes
+### Lợi ích của index
 
-Indexes enable the server to navigate quickly to a desired position in the table, but that’s
-not all they’re good for. As you’ve probably gathered by now, indexes have several
-additional benefits, based on the properties of the data structures used to create them.
+Index cho phép server nhảy một cách nhanh chóng đến vị trí nào đó trên talbe, nhưng không phải lúc nào chúng cũng là lựa chọn tốt.Những thông tin mà bạn đã biết từ trước đến bây giờ thì index có nhiều ưu khác nhau dựa trên data structure của nó.
 
-B-Tree indexes, which are the most common type you’ll use, function by storing the
-data in sorted order, and MySQL can exploit that for queries with clauses such as ORDER
-BY and GROUP BY. Because the data is presorted, a B-Tree index also stores related values
-close together. Finally, the index actually stores a copy of the values, so some queries
-can be satisfied from the index alone. Three main benefits proceed from these
-properties:
+B-Tree index là loại phổ biến nhất bạn sẽ sử dụng, hoạt động bằng cách lưu trữ dữ liệu theo thứ tự được sắp xếp và MySQL có thể khai thác các truy vấn đó bằng các mệnh đề như `ORDER BY` và `GROUP BY`. Bởi vì dữ liệu được sắp xếp trước, B-Tree index cũng lưu trữ các giá trị liên quan gần nhau. Index thực sự lưu trữ một bản sao của các giá trị, vì vậy một số truy vấn có thể tìm thấy từ index. Ba lợi ích chính thu được từ các tính chất này:
 
-1. Indexes reduce the amount of data the server has to examine.
-2. Indexes help the server avoid sorting and temporary tables.
-3. Indexes turn random I/O into sequential I/O.
+1.Index làm giảm lượng data server phải truy vấn. 
+2.Index giúp server tránh việc sắp xếp và sử dụng các bảng tạm(temporary table). 
+3.Index chuyển random(ngẫu nhiên) I/O thành sequential(tuần tự) I/O
 
-This subject really deserves an entire book. For those who would like to dig in deeply,
-we recommend _Relational Database Index Design and the Optimizers_ , by Tapio Lah-
-denmaki and Mike Leach (Wiley). It explains topics such as how to calculate the costs
-and benefits of indexes, how to estimate query speed, and how to determine whether
-indexes will be more expensive to maintain than the benefit they provide.
+ Chủ đề này thự sự có giá trị nhất trong toàn bộ quyển sách. Đối với những người muốn tìm hiểu sâu hơn nữa, chúng tôi đề nghị đọc Relational Database Index Design and the Optimizers của tác giả Tapio Lahdenmaki và Mike Leach (Wiley). Nó có những chủ đề giải thích cách tính chi phí và lợi ích của index, làm sao để ước tính tốc độ query và cách xác định liệu  có tốn kém hơn trong việc bảo trì các index hơn lợi ích mà nó cung cấp.
 
-Lahdenmaki and Leach’s book also introduces a three-star system for grading how
-suitable an index is for a query. The index earns one star if it places relevant rows
-adjacent to each other, a second star if its rows are sorted in the order the query needs,
-and a final star if it contains all the columns needed for the query.
+Sách của Lahdenmaki and Leach còn giới thiệu hệ thống three-star(ba sao)  để phân loại mức độ phù hợp của index cho một truy vấn. 1 star nếu những cột liên quan đến nhau được nằm cạnh nhau, star thứ 2 nếu row được sort theo thứ thự mà query cần, và cuối cùng nếu nó bao gồm tất cả các column mà query cần.
 
-We’ll return to these principles throughout this chapter.
-
-**158 | Chapter 5: Indexing for High Performance**
+Chúng tôi sẽ quay trở lại phương pháp đánh giá này trong suốt chương này.
 
 
 ```
